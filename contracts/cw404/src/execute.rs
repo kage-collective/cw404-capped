@@ -24,7 +24,7 @@ pub fn instantiate(
 
     let token_cap = msg.token_id_cap.unwrap_or(msg.total_native_supply);
 
-    if token_cap < Uint128::from(total_supply) {
+    if token_cap < Uint128::from(msg.total_native_supply) {
         return Err(ContractError::InvalidCap {});
     }
 
