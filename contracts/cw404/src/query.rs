@@ -9,7 +9,9 @@ use cw721::{
 
 use cw_utils::Expiration;
 
-use crate::msg::{ExtendedInfoResponse, MinterResponse, QueryMsg, UserInfoResponse};
+use crate::msg::{
+    ExtendedInfoResponse, MinterResponse, QueryMsg, TokenPoolResponse, UserInfoResponse,
+};
 use crate::state::{
     ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, LOCKED, MINTED, NAME, OWNED,
     OWNED_INDEX, OWNER_OF, SYMBOL, TOTAL_SUPPLY,
@@ -264,6 +266,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AllTokens { start_after, limit } => {
             to_json_binary(&all_tokens(deps, start_after, limit)?)
         }
+        QueryMsg::TokenPool {} => to_json_binary(&token_pool(deps)?),
     }
 }
 
@@ -273,4 +276,9 @@ pub fn minter(deps: Deps) -> StdResult<MinterResponse> {
         .map(|a| a.into_string());
 
     Ok(MinterResponse { minter })
+}
+
+pub fn token_pool(deps: Deps) -> StdResult<TokenPoolResponse> {
+    let pool = crate::state::TOKEN_POOL.load(deps.storage)?;
+    Ok(TokenPoolResponse { pool })
 }

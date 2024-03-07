@@ -1,7 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use cosmwasm_std::{to_json_binary, Addr, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 pub const OWNER: Item<String> = Item::new("owner");
 
@@ -24,6 +24,12 @@ pub const OWNED: Map<String, Vec<Uint128>> = Map::new("owned");
 /// @dev Tracks indices for the _owned mapping
 pub const OWNED_INDEX: Map<String, Uint128> = Map::new("owned_index");
 pub const APPROVED_FOR_ALL: Map<(String, String), bool> = Map::new("approved_for_all");
+
+/// @dev Tracks the available token_ids for minting
+pub const TOKEN_POOL: Item<Vec<Uint128>> = Item::new("token_pool");
+
+/// @dev Tracks assignment flag, tokenId -> isAssigned
+pub const ID_ASSIGNED: Map<String, bool> = Map::new("id_assigned");
 
 /// Additional features
 /// @dev prevents being burnt due to transfers made in mistake

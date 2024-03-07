@@ -15,16 +15,22 @@ pub enum ContractError {
 
     #[error("token_id already claimed")]
     Claimed {},
-   
+
     #[error("Unauthorized")]
     Unauthorized {},
-    
+
     #[error("InvalidSender")]
     InvalidSender {},
-    
+
     #[error("InvalidRecipient")]
     InvalidRecipient {},
-    
+
+    #[error("EmptyPool")]
+    EmptyPool {},
+
+    #[error("IdNotAssigned")]
+    IdNotAssigned {},
+
     #[error("AlreadyExists")]
     AlreadyExists {},
 

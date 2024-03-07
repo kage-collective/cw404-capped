@@ -7,8 +7,10 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Cw20ReceiveMsg, ALLOWANCE, APPROVED_FOR_ALL, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED,
-    LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOTAL_SUPPLY, WHITELIST,
+    ID_ASSIGNED, LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_POOL,
+    TOTAL_SUPPLY, WHITELIST,
 };
+use sha3::{Digest, Sha3_256};
 
 pub fn instantiate(
     deps: DepsMut,
@@ -22,6 +24,7 @@ pub fn instantiate(
     MINTED.save(deps.storage, &Uint128::zero())?;
     NAME.save(deps.storage, &msg.name)?;
     SYMBOL.save(deps.storage, &msg.symbol)?;
+    TOKEN_POOL.save(deps.storage, &vec![])?;
 
     OWNER.save(deps.storage, &info.sender.to_string())?;
 
@@ -497,7 +500,7 @@ fn get_unit(storage: &dyn Storage) -> Result<Uint128, ContractError> {
 fn _transfer(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     from: String,
     to: String,
     amount: Uint128,
@@ -556,7 +559,7 @@ fn _transfer(
             / unit)
             - (balance_before_receiver / unit);
         for _i in 0..tokens_to_mint.u128() {
-            let msg = _mint(deps.storage, env.clone(), to.clone())?;
+            let msg = _mint(deps.storage, env.clone(), info.clone(), to.clone())?;
             messages.push(msg);
         }
     }
@@ -569,31 +572,67 @@ fn _transfer(
         .add_attribute("amount", amount))
 }
 
-fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, ContractError> {
+fn _mint(
+    storage: &mut dyn Storage,
+    env: Env,
+    info: MessageInfo,
+    to: String,
+) -> Result<WasmMsg, ContractError> {
     if to == "" {
         return Err(ContractError::InvalidRecipient {});
     }
 
     let minted = MINTED.load(storage)?;
-    let id = minted + Uint128::one();
-    MINTED.save(storage, &id)?;
+    let total_supply = TOTAL_SUPPLY.load(storage)?;
+    let decimal = DECIMALS.load(storage)?;
+    let token_id_cap = total_supply / Uint128::new(10).pow(decimal.into());
+
+    let mut next_id = minted + Uint128::new(1);
+
+    if next_id <= token_id_cap {
+        MINTED.save(storage, &next_id)?;
+    } else {
+        let mut pool = TOKEN_POOL.load(storage)?;
+        if pool.len() == 0 {
+            return Err(ContractError::EmptyPool {});
+        }
+        // get random id from pool
+        let seed = format!("{}{}{}{}", env.block.time, info.sender, pool.len(), to);
+
+        let hash = Sha3_256::digest(seed.as_bytes());
+
+        let rand_num = Uint128::from(u128::from_le_bytes(
+            hash[..16].try_into().expect("Invalid random seed"),
+        ));
+
+        let random_idx = rand_num % Uint128::new(pool.len().try_into().unwrap());
+
+        next_id = pool[random_idx.u128() as usize];
+
+        pool[random_idx.u128() as usize] = pool[pool.len() - 1];
+        pool.pop();
+
+        TOKEN_POOL.save(storage, &pool)?;
+    }
 
     let owner_of = OWNER_OF
-        .may_load(storage, id.to_string())?
+        .may_load(storage, next_id.to_string())?
         .unwrap_or("".to_string());
 
     if owner_of != "" {
         return Err(ContractError::AlreadyExists {});
     }
 
-    OWNER_OF.save(storage, id.to_string(), &to)?;
+    ID_ASSIGNED.save(storage, next_id.to_string(), &true)?;
+
+    OWNER_OF.save(storage, next_id.to_string(), &to)?;
 
     let mut owned = OWNED.may_load(storage, to.clone())?.unwrap_or(vec![]);
-    owned.push(id);
+    owned.push(next_id);
     OWNED.save(storage, to.clone(), &owned)?;
     OWNED_INDEX.save(
         storage,
-        id.to_string(),
+        next_id.to_string(),
         &Uint128::from((owned.len() - 1) as u128),
     )?;
 
@@ -602,7 +641,7 @@ fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, Con
         msg: to_json_binary(&ExecuteMsg::GenerateNftMintEvent {
             sender: env.contract.address.to_string(),
             recipient: to,
-            token_id: id,
+            token_id: next_id,
         })?,
         funds: vec![],
     })
@@ -615,6 +654,21 @@ fn _burn(storage: &mut dyn Storage, env: Env, from: String) -> Result<WasmMsg, C
 
     let mut owned = OWNED.may_load(storage, from.clone())?.unwrap_or(vec![]);
     let id = owned[owned.len() - 1];
+
+    // Return token_id to pool
+    let is_assigned = ID_ASSIGNED.load(storage, id.to_string())?;
+
+    if !is_assigned {
+        return Err(ContractError::IdNotAssigned {});
+    }
+
+    TOKEN_POOL.update(storage, |mut pool| -> StdResult<_> {
+        pool.push(id);
+        Ok(pool)
+    })?;
+
+    ID_ASSIGNED.save(storage, id.to_string(), &false)?;
+
     owned.pop();
     OWNED.save(storage, from.clone(), &owned)?;
     OWNED_INDEX.remove(storage, id.to_string());

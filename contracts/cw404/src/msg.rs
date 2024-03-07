@@ -166,6 +166,10 @@ pub enum QueryMsg {
     // Return the minter
     #[returns(MinterResponse)]
     Minter {},
+
+    // Return token pool
+    #[returns(TokenPoolResponse)]
+    TokenPool {},
 }
 
 // Shows who can mint these tokens
@@ -184,4 +188,9 @@ pub struct UserInfoResponse {
 pub struct ExtendedInfoResponse {
     pub owned_index: Uint128,
     pub owner_of: String,
+}
+
+#[cw_serde]
+pub struct TokenPoolResponse {
+    pub pool: Vec<Uint128>,
 }
