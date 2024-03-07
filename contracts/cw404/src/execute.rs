@@ -7,8 +7,8 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Cw20ReceiveMsg, ALLOWANCE, APPROVED_FOR_ALL, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED,
-    ID_ASSIGNED, LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_POOL,
-    TOTAL_SUPPLY, WHITELIST,
+    ID_ASSIGNED, LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_ID_CAP,
+    TOKEN_POOL, TOTAL_SUPPLY, WHITELIST,
 };
 use sha3::{Digest, Sha3_256};
 
@@ -21,6 +21,10 @@ pub fn instantiate(
     let total_supply = msg.total_native_supply.u128() * ((10u128).pow(msg.decimals.into()));
     DECIMALS.save(deps.storage, &msg.decimals)?;
     TOTAL_SUPPLY.save(deps.storage, &Uint128::from(total_supply))?;
+    TOKEN_ID_CAP.save(
+        deps.storage,
+        &msg.token_id_cap.unwrap_or(msg.total_native_supply),
+    )?;
     MINTED.save(deps.storage, &Uint128::zero())?;
     NAME.save(deps.storage, &msg.name)?;
     SYMBOL.save(deps.storage, &msg.symbol)?;
@@ -135,7 +139,30 @@ pub fn execute(
         // Auxillary functions
         ExecuteMsg::SetWhitelist { target, state } => set_whitelist(deps, env, info, target, state),
         ExecuteMsg::SetBaseTokenUri { uri } => set_base_token_uri(deps, env, info, uri),
+        ExecuteMsg::SetTokenIdCap { cap } => set_token_id_cap(deps, env, info, cap),
     }
+}
+
+fn set_token_id_cap(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    cap: Uint128,
+) -> Result<Response, ContractError> {
+    let owner = OWNER.load(deps.storage)?;
+    if info.sender.to_string() != owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    if cap <= MINTED.load(deps.storage)? {
+        return Err(ContractError::InvalidCap {});
+    }
+
+    TOKEN_ID_CAP.save(deps.storage, &cap)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "set_token_id_cap")
+        .add_attribute("token_id_cap", cap.to_string()))
 }
 
 pub fn set_whitelist(
@@ -583,9 +610,8 @@ fn _mint(
     }
 
     let minted = MINTED.load(storage)?;
-    let total_supply = TOTAL_SUPPLY.load(storage)?;
-    let decimal = DECIMALS.load(storage)?;
-    let token_id_cap = total_supply / Uint128::new(10).pow(decimal.into());
+
+    let token_id_cap = TOKEN_ID_CAP.load(storage)?;
 
     let mut next_id = minted + Uint128::new(1);
 

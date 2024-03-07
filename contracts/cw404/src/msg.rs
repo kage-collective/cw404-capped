@@ -13,6 +13,8 @@ pub struct InstantiateMsg {
     // Supply of NFTs max
     pub total_native_supply: Uint128,
 
+    // Max token_id that can be minted
+    pub token_id_cap: Option<Uint128>,
     // The minter is the only one who can create new NFTs.
     // This is designed for a base NFT that is controlled by an external program
     // or contract. You will likely replace this with custom logic in custom NFTs
@@ -94,6 +96,9 @@ pub enum ExecuteMsg {
     },
     SetBaseTokenUri {
         uri: String,
+    },
+    SetTokenIdCap {
+        cap: Uint128,
     },
 }
 
@@ -193,4 +198,5 @@ pub struct ExtendedInfoResponse {
 #[cw_serde]
 pub struct TokenPoolResponse {
     pub pool: Vec<Uint128>,
+    pub token_id_cap: Uint128,
 }

@@ -14,7 +14,7 @@ use crate::msg::{
 };
 use crate::state::{
     ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, LOCKED, MINTED, NAME, OWNED,
-    OWNED_INDEX, OWNER_OF, SYMBOL, TOTAL_SUPPLY,
+    OWNED_INDEX, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOKEN_POOL, TOTAL_SUPPLY,
 };
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -279,6 +279,8 @@ pub fn minter(deps: Deps) -> StdResult<MinterResponse> {
 }
 
 pub fn token_pool(deps: Deps) -> StdResult<TokenPoolResponse> {
-    let pool = crate::state::TOKEN_POOL.load(deps.storage)?;
-    Ok(TokenPoolResponse { pool })
+    let pool = TOKEN_POOL.load(deps.storage)?;
+    let token_id_cap = TOKEN_ID_CAP.load(deps.storage)?;
+
+    Ok(TokenPoolResponse { pool, token_id_cap })
 }

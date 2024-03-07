@@ -31,6 +31,9 @@ pub enum ContractError {
     #[error("IdNotAssigned")]
     IdNotAssigned {},
 
+    #[error("InvalidCap")]
+    InvalidCap {},
+
     #[error("AlreadyExists")]
     AlreadyExists {},
 

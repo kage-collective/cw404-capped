@@ -1,16 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{
-        coins, Addr, BlockInfo, Coin, DepsMut, Env, MessageInfo, Response, Uint128,
-    };
+    use cosmwasm_std::{coins, Addr, Uint128};
     use cw20::TokenInfoResponse;
     use cw_multi_test::{App, ContractWrapper, Executor};
 
     use crate::{
         contract::{execute, instantiate},
-        msg::UserInfoResponse,
+        msg::{TokenPoolResponse, UserInfoResponse},
         query::query,
-        ContractError, ExecuteMsg, InstantiateMsg, QueryMsg,
+        ExecuteMsg, InstantiateMsg, QueryMsg,
     };
 
     #[test]
@@ -29,6 +27,7 @@ mod tests {
                     symbol: "test".to_string(),
                     decimals: 18,
                     total_native_supply: Uint128::new(10),
+                    token_id_cap: None,
                     minter: None,
                 },
                 &[],
@@ -74,6 +73,7 @@ mod tests {
                     symbol: "test".to_string(),
                     decimals: 18,
                     total_native_supply: Uint128::new(5),
+                    token_id_cap: None,
                     minter: None,
                 },
                 &[],
@@ -107,8 +107,6 @@ mod tests {
             .unwrap();
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
-
-        wasms.clone().for_each(|w| println!("{:?}", w.attributes));
 
         assert!(wasms
             .clone()
@@ -167,8 +165,6 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        wasms.clone().for_each(|w| println!("{:?}", w.attributes));
-
         assert!(wasms
             .clone()
             .find(|w| w
@@ -178,9 +174,275 @@ mod tests {
             .is_some());
 
         // assert max token_id is 5
-        wasms
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            5
+        );
+    }
+
+    #[test]
+    fn test_cap_limit() {
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &Addr::unchecked("user"), coins(101, "inj"))
+                .unwrap()
+        });
+
+        let code = ContractWrapper::new(execute, instantiate, query);
+        let code_id = app.store_code(Box::new(code));
+
+        let cw404_contract = app
+            .instantiate_contract(
+                code_id,
+                Addr::unchecked("owner"),
+                &InstantiateMsg {
+                    name: "test".to_string(),
+                    symbol: "test".to_string(),
+                    decimals: 18,
+                    total_native_supply: Uint128::new(5),
+                    token_id_cap: Some(Uint128::new(8)),
+                    minter: None,
+                },
+                &[],
+                "Contract",
+                None,
+            )
+            .unwrap();
+
+        // whitelist self to prevent burning
+        app.execute_contract(
+            Addr::unchecked("owner"),
+            cw404_contract.clone(),
+            &ExecuteMsg::SetWhitelist {
+                target: Addr::unchecked("owner").to_string(),
+                state: true,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // owner -> user transfer
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("owner"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user").to_string(),
+                    amount: Uint128::new(5) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        // wasms.clone().for_each(|w| println!("{:?}", w.attributes));
+
+        assert!(wasms
             .clone()
-            .map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
-            .for_each(|a| println!("{:?}", a));
+            .find(|w| w
+                .attributes
+                .iter()
+                .any(|a| a.key == "action" && a.value == "transfer"))
+            .is_some());
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter(|w| w
+                    .attributes
+                    .iter()
+                    .any(|a| a.key == "action" && a.value == "mint"))
+                .count(),
+            5
+        );
+
+        let resp: UserInfoResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw404_contract.clone(),
+                &QueryMsg::UserInfo {
+                    address: Addr::unchecked("user").to_string(),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            resp,
+            UserInfoResponse {
+                owned: vec![
+                    Uint128::new(1),
+                    Uint128::new(2),
+                    Uint128::new(3),
+                    Uint128::new(4),
+                    Uint128::new(5)
+                ],
+                balances: Uint128::new(5) * Uint128::new(10).pow(18)
+            }
+        );
+
+        // User -> User3 transfer
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user3").to_string(),
+                    amount: Uint128::new(5) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        // wasms.clone().for_each(|w| println!("{:?}", w.attributes));
+
+        assert!(wasms
+            .clone()
+            .find(|w| w
+                .attributes
+                .iter()
+                .any(|a| a.key == "action" && a.value == "transfer"))
+            .is_some());
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            8
+        );
+
+        // User3 -> User2 transfer
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user3"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user2").to_string(),
+                    amount: Uint128::new(5) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert!(wasms
+            .clone()
+            .find(|w| w
+                .attributes
+                .iter()
+                .any(|a| a.key == "action" && a.value == "transfer"))
+            .is_some());
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            8
+        );
+
+        // Increase cap
+        app.execute_contract(
+            Addr::unchecked("owner"),
+            cw404_contract.clone(),
+            &ExecuteMsg::SetTokenIdCap {
+                cap: Uint128::new(9),
+            },
+            &[],
+        )
+        .unwrap();
+
+        //  User2 -> user3 transfer (2 tokens)
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user2"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user3").to_string(),
+                    amount: Uint128::new(2) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            9
+        );
+
+        // user3 -> user2 transfer (2 tokens)
+        app.execute_contract(
+            Addr::unchecked("user3"),
+            cw404_contract.clone(),
+            &ExecuteMsg::Transfer {
+                recipient: Addr::unchecked("user2").to_string(),
+                amount: Uint128::new(2) * Uint128::new(10).pow(18),
+            },
+            &[],
+        )
+        .unwrap();
+
+        //  User2 -> owner transfer (burn all tokens)
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user2"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("owner").to_string(),
+                    amount: Uint128::new(5) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert!(wasms
+            .clone()
+            .find(|w| w
+                .attributes
+                .iter()
+                .any(|a| a.key == "action" && a.value == "transfer"))
+            .is_some());
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w
+                    .attributes
+                    .iter()
+                    .find(|a| a.key == "action" && a.value == "burn"))
+                .count(),
+            5
+        );
+
+        let resp: TokenPoolResponse = app
+            .wrap()
+            .query_wasm_smart(cw404_contract, &QueryMsg::TokenPool {})
+            .unwrap();
+
+        assert_eq!(resp.pool.len(), 9);
+        assert_eq!(resp.token_id_cap, Uint128::new(9));
     }
 }
