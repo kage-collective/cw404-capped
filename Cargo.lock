@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "cw404-capped"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "cw721"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",

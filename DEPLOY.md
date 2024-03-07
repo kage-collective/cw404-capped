@@ -29,7 +29,7 @@ injectived query wasm contract-state smart $TEST_404 "$BALANCE_404" --node=https
 
 INJ_USER2=inj15x87psc989d5yeyxs9vpe5aa7wlaak6730v43q
 
-TRANSFER_404='{"transfer":{"recipient":"'$INJ_USER2'","amount":"500000000000000000000"}}'
+TRANSFER_404='{"transfer":{"recipient":"'$INJ_USER2'","amount":"400000000000000000000"}}'
 
 yes 12345678 | injectived tx wasm execute $TEST_404 "$TRANSFER_404" --from=$(echo $INJ_ADDRESS) --chain-id="injective-888" --yes --gas-prices=500000000inj --gas=50000000 --node=https://testnet.sentry.tm.injective.network:443 --dry-run
 
