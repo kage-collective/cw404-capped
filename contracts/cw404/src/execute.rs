@@ -21,10 +21,14 @@ pub fn instantiate(
     let total_supply = msg.total_native_supply.u128() * ((10u128).pow(msg.decimals.into()));
     DECIMALS.save(deps.storage, &msg.decimals)?;
     TOTAL_SUPPLY.save(deps.storage, &Uint128::from(total_supply))?;
-    TOKEN_ID_CAP.save(
-        deps.storage,
-        &msg.token_id_cap.unwrap_or(msg.total_native_supply),
-    )?;
+
+    let token_cap = msg.token_id_cap.unwrap_or(msg.total_native_supply);
+
+    if token_cap < Uint128::from(total_supply) {
+        return Err(ContractError::InvalidCap {});
+    }
+
+    TOKEN_ID_CAP.save(deps.storage, &token_cap)?;
     MINTED.save(deps.storage, &Uint128::zero())?;
     NAME.save(deps.storage, &msg.name)?;
     SYMBOL.save(deps.storage, &msg.symbol)?;
