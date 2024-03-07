@@ -1,6 +1,6 @@
 [package]
-name = "cw404-fixed"
-description = "Basic implementation of cw404 NFTs with fixed supply"
+name = "cw404-capped"
+description = "Basic implementation of cw404 NFTs with capped token_id"
 authors = ["@kagen", "@dojotrading"]
 version = { workspace = true }
 edition = { workspace = true }

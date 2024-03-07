@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use cw404_fixed::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use cw404_capped::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {

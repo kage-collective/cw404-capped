@@ -1,47 +1,116 @@
 {
-  "contract_name": "cw721-base",
-  "contract_version": "0.18.0",
+  "contract_name": "cw404-capped",
+  "contract_version": "0.20.0",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "InstantiateMsg",
     "type": "object",
     "required": [
+      "decimals",
       "name",
-      "symbol"
+      "symbol",
+      "total_native_supply"
     ],
     "properties": {
+      "decimals": {
+        "type": "integer",
+        "format": "uint8",
+        "minimum": 0.0
+      },
       "minter": {
-        "description": "The minter is the only one who can create new NFTs. This is designed for a base NFT that is controlled by an external program or contract. You will likely replace this with custom logic in custom NFTs",
         "type": [
           "string",
           "null"
         ]
       },
       "name": {
-        "description": "Name of the NFT contract",
         "type": "string"
       },
       "symbol": {
-        "description": "Symbol of the NFT contract",
         "type": "string"
       },
-      "withdraw_address": {
-        "type": [
-          "string",
-          "null"
+      "token_id_cap": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/Uint128"
+          },
+          {
+            "type": "null"
+          }
         ]
+      },
+      "total_native_supply": {
+        "$ref": "#/definitions/Uint128"
       }
     },
-    "additionalProperties": false
+    "additionalProperties": false,
+    "definitions": {
+      "Uint128": {
+        "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+        "type": "string"
+      }
+    }
   },
   "execute": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "ExecuteMsg",
-    "description": "This is like Cw721ExecuteMsg but we add a Mint command for an owner to make this stand-alone. You will likely want to remove mint and use other control logic in any contract that inherits this.",
     "oneOf": [
       {
-        "description": "Transfer is a base message to move a token to another account without triggering actions",
+        "type": "object",
+        "required": [
+          "transfer_from"
+        ],
+        "properties": {
+          "transfer_from": {
+            "type": "object",
+            "required": [
+              "amount",
+              "owner",
+              "recipient"
+            ],
+            "properties": {
+              "amount": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "recipient": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "transfer"
+        ],
+        "properties": {
+          "transfer": {
+            "type": "object",
+            "required": [
+              "amount",
+              "recipient"
+            ],
+            "properties": {
+              "amount": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "recipient": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
         "type": "object",
         "required": [
           "transfer_nft"
@@ -58,7 +127,7 @@
                 "type": "string"
               },
               "token_id": {
-                "type": "string"
+                "$ref": "#/definitions/Uint128"
               }
             },
             "additionalProperties": false
@@ -67,7 +136,35 @@
         "additionalProperties": false
       },
       {
-        "description": "Send is a base message to transfer a token to a contract and trigger an action on the receiving contract.",
+        "type": "object",
+        "required": [
+          "send"
+        ],
+        "properties": {
+          "send": {
+            "type": "object",
+            "required": [
+              "amount",
+              "contract",
+              "msg"
+            ],
+            "properties": {
+              "amount": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "contract": {
+                "type": "string"
+              },
+              "msg": {
+                "$ref": "#/definitions/Binary"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
         "type": "object",
         "required": [
           "send_nft"
@@ -88,6 +185,41 @@
                 "$ref": "#/definitions/Binary"
               },
               "token_id": {
+                "$ref": "#/definitions/Uint128"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "increase_allowance"
+        ],
+        "properties": {
+          "increase_allowance": {
+            "type": "object",
+            "required": [
+              "amount",
+              "spender"
+            ],
+            "properties": {
+              "amount": {
+                "$ref": "#/definitions/Uint128"
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Expiration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "spender": {
                 "type": "string"
               }
             },
@@ -97,7 +229,6 @@
         "additionalProperties": false
       },
       {
-        "description": "Allows operator to transfer / send the token from the owner's account. If expiration is set, then this allowance has a time/height limit",
         "type": "object",
         "required": [
           "approve"
@@ -124,7 +255,7 @@
                 "type": "string"
               },
               "token_id": {
-                "type": "string"
+                "$ref": "#/definitions/Uint128"
               }
             },
             "additionalProperties": false
@@ -133,33 +264,6 @@
         "additionalProperties": false
       },
       {
-        "description": "Remove previously granted Approval",
-        "type": "object",
-        "required": [
-          "revoke"
-        ],
-        "properties": {
-          "revoke": {
-            "type": "object",
-            "required": [
-              "spender",
-              "token_id"
-            ],
-            "properties": {
-              "spender": {
-                "type": "string"
-              },
-              "token_id": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit",
         "type": "object",
         "required": [
           "approve_all"
@@ -191,7 +295,6 @@
         "additionalProperties": false
       },
       {
-        "description": "Remove previously granted ApproveAll permission",
         "type": "object",
         "required": [
           "revoke_all"
@@ -213,42 +316,27 @@
         "additionalProperties": false
       },
       {
-        "description": "Mint a new NFT, can only be called by the contract minter",
         "type": "object",
         "required": [
-          "mint"
+          "generate_nft_event"
         ],
         "properties": {
-          "mint": {
+          "generate_nft_event": {
             "type": "object",
             "required": [
-              "extension",
-              "owner",
+              "recipient",
+              "sender",
               "token_id"
             ],
             "properties": {
-              "extension": {
-                "description": "Any custom extension used by this contract",
-                "allOf": [
-                  {
-                    "$ref": "#/definitions/Empty"
-                  }
-                ]
+              "recipient": {
+                "type": "string"
               },
-              "owner": {
-                "description": "The owner of the newly minter NFT",
+              "sender": {
                 "type": "string"
               },
               "token_id": {
-                "description": "Unique ID of the NFT",
-                "type": "string"
-              },
-              "token_uri": {
-                "description": "Universal resource identifier for this NFT Should point to a JSON file that conforms to the ERC721 Metadata JSON Schema",
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "$ref": "#/definitions/Uint128"
               }
             },
             "additionalProperties": false
@@ -257,19 +345,76 @@
         "additionalProperties": false
       },
       {
-        "description": "Burn an NFT the sender has access to",
         "type": "object",
         "required": [
-          "burn"
+          "generate_nft_mint_event"
         ],
         "properties": {
-          "burn": {
+          "generate_nft_mint_event": {
             "type": "object",
             "required": [
+              "recipient",
+              "sender",
               "token_id"
             ],
             "properties": {
+              "recipient": {
+                "type": "string"
+              },
+              "sender": {
+                "type": "string"
+              },
               "token_id": {
+                "$ref": "#/definitions/Uint128"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "generate_nft_burn_event"
+        ],
+        "properties": {
+          "generate_nft_burn_event": {
+            "type": "object",
+            "required": [
+              "sender",
+              "token_id"
+            ],
+            "properties": {
+              "sender": {
+                "type": "string"
+              },
+              "token_id": {
+                "$ref": "#/definitions/Uint128"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "set_whitelist"
+        ],
+        "properties": {
+          "set_whitelist": {
+            "type": "object",
+            "required": [
+              "state",
+              "target"
+            ],
+            "properties": {
+              "state": {
+                "type": "boolean"
+              },
+              "target": {
                 "type": "string"
               }
             },
@@ -279,20 +424,23 @@
         "additionalProperties": false
       },
       {
-        "description": "Extension msg",
         "type": "object",
         "required": [
-          "extension"
+          "set_lock"
         ],
         "properties": {
-          "extension": {
+          "set_lock": {
             "type": "object",
             "required": [
-              "msg"
+              "state",
+              "token_id"
             ],
             "properties": {
-              "msg": {
-                "$ref": "#/definitions/Empty"
+              "state": {
+                "type": "boolean"
+              },
+              "token_id": {
+                "$ref": "#/definitions/Uint128"
               }
             },
             "additionalProperties": false
@@ -301,19 +449,18 @@
         "additionalProperties": false
       },
       {
-        "description": "Sets address to send withdrawn fees to. Only owner can call this.",
         "type": "object",
         "required": [
-          "set_withdraw_address"
+          "set_base_token_uri"
         ],
         "properties": {
-          "set_withdraw_address": {
+          "set_base_token_uri": {
             "type": "object",
             "required": [
-              "address"
+              "uri"
             ],
             "properties": {
-              "address": {
+              "uri": {
                 "type": "string"
               }
             },
@@ -323,129 +470,31 @@
         "additionalProperties": false
       },
       {
-        "description": "Removes the withdraw address, so fees are sent to the contract. Only owner can call this.",
         "type": "object",
         "required": [
-          "remove_withdraw_address"
+          "set_token_id_cap"
         ],
         "properties": {
-          "remove_withdraw_address": {
-            "type": "object",
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "Withdraw from the contract to the given address. Anyone can call this, which is okay since withdraw address has been set by owner.",
-        "type": "object",
-        "required": [
-          "withdraw_funds"
-        ],
-        "properties": {
-          "withdraw_funds": {
+          "set_token_id_cap": {
             "type": "object",
             "required": [
-              "amount"
+              "cap"
             ],
             "properties": {
-              "amount": {
-                "$ref": "#/definitions/Coin"
+              "cap": {
+                "$ref": "#/definitions/Uint128"
               }
             },
             "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "Update the contract's ownership. The `action` to be provided can be either to propose transferring ownership to an account, accept a pending ownership transfer, or renounce the ownership permanently.",
-        "type": "object",
-        "required": [
-          "update_ownership"
-        ],
-        "properties": {
-          "update_ownership": {
-            "$ref": "#/definitions/Action"
           }
         },
         "additionalProperties": false
       }
     ],
     "definitions": {
-      "Action": {
-        "description": "Actions that can be taken to alter the contract's ownership",
-        "oneOf": [
-          {
-            "description": "Propose to transfer the contract's ownership to another account, optionally with an expiry time.\n\nCan only be called by the contract's current owner.\n\nAny existing pending ownership transfer is overwritten.",
-            "type": "object",
-            "required": [
-              "transfer_ownership"
-            ],
-            "properties": {
-              "transfer_ownership": {
-                "type": "object",
-                "required": [
-                  "new_owner"
-                ],
-                "properties": {
-                  "expiry": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/definitions/Expiration"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "new_owner": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          },
-          {
-            "description": "Accept the pending ownership transfer.\n\nCan only be called by the pending owner.",
-            "type": "string",
-            "enum": [
-              "accept_ownership"
-            ]
-          },
-          {
-            "description": "Give up the contract's ownership and the possibility of appointing a new owner.\n\nCan only be invoked by the contract's current owner.\n\nAny existing pending ownership transfer is canceled.",
-            "type": "string",
-            "enum": [
-              "renounce_ownership"
-            ]
-          }
-        ]
-      },
       "Binary": {
         "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>. See also <https://github.com/CosmWasm/cosmwasm/blob/main/docs/MESSAGE_TYPES.md>.",
         "type": "string"
-      },
-      "Coin": {
-        "type": "object",
-        "required": [
-          "amount",
-          "denom"
-        ],
-        "properties": {
-          "amount": {
-            "$ref": "#/definitions/Uint128"
-          },
-          "denom": {
-            "type": "string"
-          }
-        }
-      },
-      "Empty": {
-        "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
-        "type": "object"
       },
       "Expiration": {
         "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
@@ -517,7 +566,6 @@
     "title": "QueryMsg",
     "oneOf": [
       {
-        "description": "Return the owner of the given token, error if token does not exist",
         "type": "object",
         "required": [
           "owner_of"
@@ -530,7 +578,6 @@
             ],
             "properties": {
               "include_expired": {
-                "description": "unset or false will filter out expired approvals, you must set to true to see them",
                 "type": [
                   "boolean",
                   "null"
@@ -546,30 +593,65 @@
         "additionalProperties": false
       },
       {
-        "description": "Return operator that can access all of the owner's tokens.",
         "type": "object",
         "required": [
-          "approval"
+          "is_locked"
         ],
         "properties": {
-          "approval": {
+          "is_locked": {
             "type": "object",
             "required": [
-              "spender",
               "token_id"
             ],
             "properties": {
-              "include_expired": {
-                "type": [
-                  "boolean",
-                  "null"
-                ]
+              "token_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "user_info"
+        ],
+        "properties": {
+          "user_info": {
+            "type": "object",
+            "required": [
+              "address"
+            ],
+            "properties": {
+              "address": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "allowance"
+        ],
+        "properties": {
+          "allowance": {
+            "type": "object",
+            "required": [
+              "owner",
+              "spender"
+            ],
+            "properties": {
+              "owner": {
+                "type": "string"
               },
               "spender": {
                 "type": "string"
-              },
-              "token_id": {
-                "type": "string"
               }
             },
             "additionalProperties": false
@@ -578,24 +660,17 @@
         "additionalProperties": false
       },
       {
-        "description": "Return approvals that a token has",
         "type": "object",
         "required": [
-          "approvals"
+          "extended_info"
         ],
         "properties": {
-          "approvals": {
+          "extended_info": {
             "type": "object",
             "required": [
               "token_id"
             ],
             "properties": {
-              "include_expired": {
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
               "token_id": {
                 "type": "string"
               }
@@ -606,82 +681,6 @@
         "additionalProperties": false
       },
       {
-        "description": "Return approval of a given operator for all tokens of an owner, error if not set",
-        "type": "object",
-        "required": [
-          "operator"
-        ],
-        "properties": {
-          "operator": {
-            "type": "object",
-            "required": [
-              "operator",
-              "owner"
-            ],
-            "properties": {
-              "include_expired": {
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "operator": {
-                "type": "string"
-              },
-              "owner": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "List all operators that can access all of the owner's tokens",
-        "type": "object",
-        "required": [
-          "all_operators"
-        ],
-        "properties": {
-          "all_operators": {
-            "type": "object",
-            "required": [
-              "owner"
-            ],
-            "properties": {
-              "include_expired": {
-                "description": "unset or false will filter out expired items, you must set to true to see them",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "limit": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "format": "uint32",
-                "minimum": 0.0
-              },
-              "owner": {
-                "type": "string"
-              },
-              "start_after": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "Total number of tokens issued",
         "type": "object",
         "required": [
           "num_tokens"
@@ -695,7 +694,6 @@
         "additionalProperties": false
       },
       {
-        "description": "With MetaData Extension. Returns top-level metadata about the contract",
         "type": "object",
         "required": [
           "contract_info"
@@ -709,7 +707,6 @@
         "additionalProperties": false
       },
       {
-        "description": "With MetaData Extension. Returns metadata about one particular token, based on *ERC721 Metadata JSON Schema* but directly from the contract",
         "type": "object",
         "required": [
           "nft_info"
@@ -731,7 +728,40 @@
         "additionalProperties": false
       },
       {
-        "description": "With MetaData Extension. Returns the result of both `NftInfo` and `OwnerOf` as one query as an optimization for clients",
+        "type": "object",
+        "required": [
+          "balance"
+        ],
+        "properties": {
+          "balance": {
+            "type": "object",
+            "required": [
+              "address"
+            ],
+            "properties": {
+              "address": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "token_info"
+        ],
+        "properties": {
+          "token_info": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
         "type": "object",
         "required": [
           "all_nft_info"
@@ -744,7 +774,6 @@
             ],
             "properties": {
               "include_expired": {
-                "description": "unset or false will filter out expired approvals, you must set to true to see them",
                 "type": [
                   "boolean",
                   "null"
@@ -760,7 +789,6 @@
         "additionalProperties": false
       },
       {
-        "description": "With Enumerable extension. Returns all tokens owned by the given address, [] if unset.",
         "type": "object",
         "required": [
           "tokens"
@@ -796,7 +824,6 @@
         "additionalProperties": false
       },
       {
-        "description": "With Enumerable extension. Requires pagination. Lists all token_ids controlled by the contract.",
         "type": "object",
         "required": [
           "all_tokens"
@@ -826,7 +853,6 @@
         "additionalProperties": false
       },
       {
-        "description": "Return the minter",
         "type": "object",
         "required": [
           "minter"
@@ -840,68 +866,26 @@
         "additionalProperties": false
       },
       {
-        "description": "Extension query",
         "type": "object",
         "required": [
-          "extension"
+          "token_pool"
         ],
         "properties": {
-          "extension": {
-            "type": "object",
-            "required": [
-              "msg"
-            ],
-            "properties": {
-              "msg": {
-                "$ref": "#/definitions/Empty"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
-          "get_withdraw_address"
-        ],
-        "properties": {
-          "get_withdraw_address": {
-            "type": "object",
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "description": "Query the contract's ownership information",
-        "type": "object",
-        "required": [
-          "ownership"
-        ],
-        "properties": {
-          "ownership": {
+          "token_pool": {
             "type": "object",
             "additionalProperties": false
           }
         },
         "additionalProperties": false
       }
-    ],
-    "definitions": {
-      "Empty": {
-        "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
-        "type": "object"
-      }
-    }
+    ]
   },
   "migrate": null,
   "sudo": null,
   "responses": {
     "all_nft_info": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AllNftInfoResponse_for_Empty",
+      "title": "AllNftInfoResponse",
       "type": "object",
       "required": [
         "access",
@@ -920,7 +904,7 @@
           "description": "Data on the token itself,",
           "allOf": [
             {
-              "$ref": "#/definitions/NftInfoResponse_for_Empty"
+              "$ref": "#/definitions/NftInfoResponse"
             }
           ]
         }
@@ -948,10 +932,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "Empty": {
-          "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
-          "type": "object"
         },
         "Expiration": {
           "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
@@ -1000,18 +980,14 @@
             }
           ]
         },
-        "NftInfoResponse_for_Empty": {
+        "NftInfoResponse": {
           "type": "object",
-          "required": [
-            "extension"
-          ],
           "properties": {
             "extension": {
               "description": "You can add any custom metadata here when you extend cw721-base",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Empty"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             },
             "token_uri": {
@@ -1059,106 +1035,6 @@
         }
       }
     },
-    "all_operators": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "OperatorsResponse",
-      "type": "object",
-      "required": [
-        "operators"
-      ],
-      "properties": {
-        "operators": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Approval"
-          }
-        }
-      },
-      "additionalProperties": false,
-      "definitions": {
-        "Approval": {
-          "type": "object",
-          "required": [
-            "expires",
-            "spender"
-          ],
-          "properties": {
-            "expires": {
-              "description": "When the Approval expires (maybe Expiration::never)",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                }
-              ]
-            },
-            "spender": {
-              "description": "Account that can transfer/send the token",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "Expiration": {
-          "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-          "oneOf": [
-            {
-              "description": "AtHeight will expire when `env.block.height` >= height",
-              "type": "object",
-              "required": [
-                "at_height"
-              ],
-              "properties": {
-                "at_height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "AtTime will expire when `env.block.time` >= time",
-              "type": "object",
-              "required": [
-                "at_time"
-              ],
-              "properties": {
-                "at_time": {
-                  "$ref": "#/definitions/Timestamp"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "Never will never expire. Used to express the empty variant",
-              "type": "object",
-              "required": [
-                "never"
-              ],
-              "properties": {
-                "never": {
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "Timestamp": {
-          "description": "A point in time in nanosecond precision.\n\nThis type can represent times from 1970-01-01T00:00:00Z to 2554-07-21T23:34:33Z.\n\n## Examples\n\n``` # use cosmwasm_std::Timestamp; let ts = Timestamp::from_nanos(1_000_000_202); assert_eq!(ts.nanos(), 1_000_000_202); assert_eq!(ts.seconds(), 1); assert_eq!(ts.subsec_nanos(), 202);\n\nlet ts = ts.plus_seconds(2); assert_eq!(ts.nanos(), 3_000_000_202); assert_eq!(ts.seconds(), 3); assert_eq!(ts.subsec_nanos(), 202); ```",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Uint64"
-            }
-          ]
-        },
-        "Uint64": {
-          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
-          "type": "string"
-        }
-      }
-    },
     "all_tokens": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "TokensResponse",
@@ -1177,42 +1053,23 @@
       },
       "additionalProperties": false
     },
-    "approval": {
+    "allowance": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ApprovalResponse",
+      "title": "AllowanceResponse",
       "type": "object",
       "required": [
-        "approval"
+        "allowance",
+        "expires"
       ],
       "properties": {
-        "approval": {
-          "$ref": "#/definitions/Approval"
+        "allowance": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "expires": {
+          "$ref": "#/definitions/Expiration"
         }
       },
-      "additionalProperties": false,
       "definitions": {
-        "Approval": {
-          "type": "object",
-          "required": [
-            "expires",
-            "spender"
-          ],
-          "properties": {
-            "expires": {
-              "description": "When the Approval expires (maybe Expiration::never)",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                }
-              ]
-            },
-            "spender": {
-              "description": "Account that can transfer/send the token",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
         "Expiration": {
           "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
           "oneOf": [
@@ -1267,6 +1124,10 @@
               "$ref": "#/definitions/Uint64"
             }
           ]
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
         },
         "Uint64": {
           "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
@@ -1274,102 +1135,22 @@
         }
       }
     },
-    "approvals": {
+    "balance": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ApprovalsResponse",
+      "title": "BalanceResponse",
       "type": "object",
       "required": [
-        "approvals"
+        "balance"
       ],
       "properties": {
-        "approvals": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Approval"
-          }
+        "balance": {
+          "$ref": "#/definitions/Uint128"
         }
       },
       "additionalProperties": false,
       "definitions": {
-        "Approval": {
-          "type": "object",
-          "required": [
-            "expires",
-            "spender"
-          ],
-          "properties": {
-            "expires": {
-              "description": "When the Approval expires (maybe Expiration::never)",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                }
-              ]
-            },
-            "spender": {
-              "description": "Account that can transfer/send the token",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "Expiration": {
-          "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-          "oneOf": [
-            {
-              "description": "AtHeight will expire when `env.block.height` >= height",
-              "type": "object",
-              "required": [
-                "at_height"
-              ],
-              "properties": {
-                "at_height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "AtTime will expire when `env.block.time` >= time",
-              "type": "object",
-              "required": [
-                "at_time"
-              ],
-              "properties": {
-                "at_time": {
-                  "$ref": "#/definitions/Timestamp"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "Never will never expire. Used to express the empty variant",
-              "type": "object",
-              "required": [
-                "never"
-              ],
-              "properties": {
-                "never": {
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "Timestamp": {
-          "description": "A point in time in nanosecond precision.\n\nThis type can represent times from 1970-01-01T00:00:00Z to 2554-07-21T23:34:33Z.\n\n## Examples\n\n``` # use cosmwasm_std::Timestamp; let ts = Timestamp::from_nanos(1_000_000_202); assert_eq!(ts.nanos(), 1_000_000_202); assert_eq!(ts.seconds(), 1); assert_eq!(ts.subsec_nanos(), 202);\n\nlet ts = ts.plus_seconds(2); assert_eq!(ts.nanos(), 3_000_000_202); assert_eq!(ts.seconds(), 3); assert_eq!(ts.subsec_nanos(), 202); ```",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Uint64"
-            }
-          ]
-        },
-        "Uint64": {
-          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
           "type": "string"
         }
       }
@@ -1392,23 +1173,38 @@
       },
       "additionalProperties": false
     },
-    "extension": {
+    "extended_info": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Null",
-      "type": "null"
+      "title": "ExtendedInfoResponse",
+      "type": "object",
+      "required": [
+        "owned_index",
+        "owner_of"
+      ],
+      "properties": {
+        "owned_index": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "owner_of": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        }
+      }
     },
-    "get_withdraw_address": {
+    "is_locked": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Nullable_String",
-      "type": [
-        "string",
-        "null"
-      ]
+      "title": "Boolean",
+      "type": "boolean"
     },
     "minter": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "MinterResponse",
-      "description": "Shows who can mint these tokens",
       "type": "object",
       "properties": {
         "minter": {
@@ -1422,18 +1218,14 @@
     },
     "nft_info": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "NftInfoResponse_for_Empty",
+      "title": "NftInfoResponse",
       "type": "object",
-      "required": [
-        "extension"
-      ],
       "properties": {
         "extension": {
           "description": "You can add any custom metadata here when you extend cw721-base",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Empty"
-            }
+          "type": [
+            "string",
+            "null"
           ]
         },
         "token_uri": {
@@ -1444,13 +1236,7 @@
           ]
         }
       },
-      "additionalProperties": false,
-      "definitions": {
-        "Empty": {
-          "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
-          "type": "object"
-        }
-      }
+      "additionalProperties": false
     },
     "num_tokens": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1467,103 +1253,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "operator": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "OperatorResponse",
-      "type": "object",
-      "required": [
-        "approval"
-      ],
-      "properties": {
-        "approval": {
-          "$ref": "#/definitions/Approval"
-        }
-      },
-      "additionalProperties": false,
-      "definitions": {
-        "Approval": {
-          "type": "object",
-          "required": [
-            "expires",
-            "spender"
-          ],
-          "properties": {
-            "expires": {
-              "description": "When the Approval expires (maybe Expiration::never)",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                }
-              ]
-            },
-            "spender": {
-              "description": "Account that can transfer/send the token",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "Expiration": {
-          "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-          "oneOf": [
-            {
-              "description": "AtHeight will expire when `env.block.height` >= height",
-              "type": "object",
-              "required": [
-                "at_height"
-              ],
-              "properties": {
-                "at_height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "AtTime will expire when `env.block.time` >= time",
-              "type": "object",
-              "required": [
-                "at_time"
-              ],
-              "properties": {
-                "at_time": {
-                  "$ref": "#/definitions/Timestamp"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "Never will never expire. Used to express the empty variant",
-              "type": "object",
-              "required": [
-                "never"
-              ],
-              "properties": {
-                "never": {
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "Timestamp": {
-          "description": "A point in time in nanosecond precision.\n\nThis type can represent times from 1970-01-01T00:00:00Z to 2554-07-21T23:34:33Z.\n\n## Examples\n\n``` # use cosmwasm_std::Timestamp; let ts = Timestamp::from_nanos(1_000_000_202); assert_eq!(ts.nanos(), 1_000_000_202); assert_eq!(ts.seconds(), 1); assert_eq!(ts.subsec_nanos(), 202);\n\nlet ts = ts.plus_seconds(2); assert_eq!(ts.nanos(), 3_000_000_202); assert_eq!(ts.seconds(), 3); assert_eq!(ts.subsec_nanos(), 202); ```",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Uint64"
-            }
-          ]
-        },
-        "Uint64": {
-          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
-          "type": "string"
-        }
-      }
     },
     "owner_of": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1671,40 +1360,130 @@
         }
       }
     },
-    "ownership": {
+    "token_info": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Ownership_for_String",
-      "description": "The contract's ownership info",
+      "title": "TokenInfoResponse",
       "type": "object",
+      "required": [
+        "decimals",
+        "name",
+        "symbol",
+        "total_supply"
+      ],
       "properties": {
-        "owner": {
-          "description": "The contract's current owner. `None` if the ownership has been renounced.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "decimals": {
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
         },
-        "pending_expiry": {
-          "description": "The deadline for the pending owner to accept the ownership. `None` if there isn't a pending ownership transfer, or if a transfer exists and it doesn't have a deadline.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Expiration"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "name": {
+          "type": "string"
         },
-        "pending_owner": {
-          "description": "The account who has been proposed to take over the ownership. `None` if there isn't a pending ownership transfer.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "symbol": {
+          "type": "string"
+        },
+        "total_supply": {
+          "$ref": "#/definitions/Uint128"
         }
       },
       "additionalProperties": false,
       "definitions": {
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "token_pool": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TokenPoolResponse",
+      "type": "object",
+      "required": [
+        "pool",
+        "token_id_cap"
+      ],
+      "properties": {
+        "pool": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Uint128"
+          }
+        },
+        "token_id_cap": {
+          "$ref": "#/definitions/Uint128"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "tokens": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TokensResponse",
+      "type": "object",
+      "required": [
+        "tokens"
+      ],
+      "properties": {
+        "tokens": {
+          "description": "Contains all token_ids in lexicographical ordering If there are more than `limit`, use `start_after` in future queries to achieve pagination.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "user_info": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OwnerOfResponse",
+      "type": "object",
+      "required": [
+        "approvals",
+        "owner"
+      ],
+      "properties": {
+        "approvals": {
+          "description": "If set this address is approved to transfer/send the token as well",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Approval"
+          }
+        },
+        "owner": {
+          "description": "Owner of the token",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Approval": {
+          "type": "object",
+          "required": [
+            "expires",
+            "spender"
+          ],
+          "properties": {
+            "expires": {
+              "description": "When the Approval expires (maybe Expiration::never)",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                }
+              ]
+            },
+            "spender": {
+              "description": "Account that can transfer/send the token",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "Expiration": {
           "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
           "oneOf": [
@@ -1765,24 +1544,6 @@
           "type": "string"
         }
       }
-    },
-    "tokens": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "TokensResponse",
-      "type": "object",
-      "required": [
-        "tokens"
-      ],
-      "properties": {
-        "tokens": {
-          "description": "Contains all token_ids in lexicographical ordering If there are more than `limit`, use `start_after` in future queries to achieve pagination.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
     }
   }
 }
