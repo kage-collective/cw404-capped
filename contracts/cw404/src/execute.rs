@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{
-    to_json_binary, Binary, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint128,
-    WasmMsg,
+    to_json_binary, Binary, DepsMut, Env, MessageInfo, Order, Response, StdResult, Storage,
+    Uint128, WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -8,9 +10,8 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Cw20ReceiveMsg, ALLOWANCE, APPROVED_FOR_ALL, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED,
     ID_ASSIGNED, LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_ID_CAP,
-    TOKEN_POOL, TOTAL_SUPPLY, WHITELIST,
+    TOTAL_SUPPLY, WHITELIST,
 };
-use sha3::{Digest, Sha3_256};
 
 pub fn instantiate(
     deps: DepsMut,
@@ -24,7 +25,7 @@ pub fn instantiate(
 
     let token_cap = msg.token_id_cap.unwrap_or(msg.total_native_supply);
 
-    if token_cap < Uint128::from(msg.total_native_supply) {
+    if token_cap < msg.total_native_supply {
         return Err(ContractError::InvalidCap {});
     }
 
@@ -32,7 +33,6 @@ pub fn instantiate(
     MINTED.save(deps.storage, &Uint128::zero())?;
     NAME.save(deps.storage, &msg.name)?;
     SYMBOL.save(deps.storage, &msg.symbol)?;
-    TOKEN_POOL.save(deps.storage, &vec![])?;
 
     OWNER.save(deps.storage, &info.sender.to_string())?;
 
@@ -73,14 +73,9 @@ pub fn execute(
             amount,
         } => transfer_from(deps, env, info, owner, recipient, amount, None),
         // This is the default implementation in erc404
-        ExecuteMsg::Transfer { recipient, amount } => transfer(
-            deps,
-            env,
-            info.clone(),
-            info.sender.to_string(),
-            recipient,
-            amount,
-        ),
+        ExecuteMsg::Transfer { recipient, amount } => {
+            transfer(deps, env, info.sender.to_string(), recipient, amount)
+        }
         // Added to ensure compatibility with cw721
         ExecuteMsg::TransferNft {
             recipient,
@@ -154,7 +149,7 @@ fn set_token_id_cap(
     cap: Uint128,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -177,7 +172,7 @@ pub fn set_whitelist(
     state: bool,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -211,7 +206,7 @@ pub fn set_lock(
     let owner_of = OWNER_OF
         .may_load(deps.storage, target.to_string())?
         .unwrap_or("".to_string());
-    if info.sender.to_string() != owner_of {
+    if info.sender != owner_of {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -229,7 +224,7 @@ pub fn set_base_token_uri(
     uri: String,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -267,14 +262,11 @@ fn transfer_from(
             return Err(ContractError::InvalidSender {});
         }
 
-        if to == "" {
+        if to.is_empty() {
             return Err(ContractError::InvalidRecipient {});
         }
 
-        if info.sender.to_string() != from
-            && !is_approved_for_all
-            && info.sender.to_string() != get_approved
-        {
+        if info.sender != from && !is_approved_for_all && info.sender != get_approved {
             return Err(ContractError::Unauthorized {});
         }
 
@@ -307,14 +299,14 @@ fn transfer_from(
             .may_load(deps.storage, from.clone())?
             .unwrap_or(vec![]);
 
-        let updated_id = vec_updated_id.get(vec_updated_id.len() - 1).unwrap();
+        let updated_id = vec_updated_id.last().unwrap();
         let owned_index = OWNED_INDEX
             .may_load(deps.storage, amount_or_id.to_string())?
             .unwrap_or(Uint128::zero());
 
         OWNED_INDEX.save(deps.storage, updated_id.to_string(), &owned_index)?;
 
-        vec_updated_id[owned_index.u128() as usize] = updated_id.clone();
+        vec_updated_id[owned_index.u128() as usize] = *updated_id;
         vec_updated_id.pop();
 
         OWNED.save(deps.storage, from.clone(), &vec_updated_id)?;
@@ -359,7 +351,6 @@ fn transfer_from(
         let response = _transfer(
             deps,
             env,
-            info.clone(),
             from,
             to,
             amount_or_id,
@@ -387,7 +378,7 @@ fn approve(
         let is_approved_for_all = APPROVED_FOR_ALL
             .may_load(deps.storage, (owner.to_string(), info.sender.to_string()))?
             .unwrap_or(false);
-        if info.sender.to_string() != owner.to_string() && !is_approved_for_all {
+        if info.sender != owner && !is_approved_for_all {
             return Err(ContractError::Unauthorized {});
         }
 
@@ -456,12 +447,11 @@ fn revoke_all(
 fn transfer(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
     from: String,
     to: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    _transfer(deps, env, info, from, to, amount, "transfer".to_string())
+    _transfer(deps, env, from, to, amount, "transfer".to_string())
 }
 
 fn send(
@@ -476,7 +466,6 @@ fn send(
     let response = _transfer(
         deps,
         env,
-        info.clone(),
         from,
         contract.clone(),
         amount,
@@ -531,7 +520,6 @@ fn get_unit(storage: &dyn Storage) -> Result<Uint128, ContractError> {
 fn _transfer(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
     from: String,
     to: String,
     amount: Uint128,
@@ -590,7 +578,7 @@ fn _transfer(
             / unit)
             - (balance_before_receiver / unit);
         for _i in 0..tokens_to_mint.u128() {
-            let msg = _mint(deps.storage, env.clone(), info.clone(), to.clone())?;
+            let msg = _mint(deps.storage, env.clone(), to.clone())?;
             messages.push(msg);
         }
     }
@@ -603,13 +591,8 @@ fn _transfer(
         .add_attribute("amount", amount))
 }
 
-fn _mint(
-    storage: &mut dyn Storage,
-    env: Env,
-    info: MessageInfo,
-    to: String,
-) -> Result<WasmMsg, ContractError> {
-    if to == "" {
+fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, ContractError> {
+    if to.is_empty() {
         return Err(ContractError::InvalidRecipient {});
     }
 
@@ -622,34 +605,33 @@ fn _mint(
     if next_id <= token_id_cap {
         MINTED.save(storage, &next_id)?;
     } else {
-        let mut pool = TOKEN_POOL.load(storage)?;
-        if pool.len() == 0 {
-            return Err(ContractError::EmptyPool {});
-        }
-        // get random id from pool
-        let seed = format!("{}{}{}{}", env.block.time, info.sender, pool.len(), to);
-
-        let hash = Sha3_256::digest(seed.as_bytes());
-
-        let rand_num = Uint128::from(u128::from_le_bytes(
-            hash[..16].try_into().expect("Invalid random seed"),
-        ));
-
-        let random_idx = rand_num % Uint128::new(pool.len().try_into().unwrap());
-
-        next_id = pool[random_idx.u128() as usize];
-
-        pool[random_idx.u128() as usize] = pool[pool.len() - 1];
-        pool.pop();
-
-        TOKEN_POOL.save(storage, &pool)?;
+        // all tokens minted
+        // find first unassigned token in map (lexical order as key is in string)
+        next_id = ID_ASSIGNED
+            .range(storage, None, None, Order::Ascending)
+            .find(|item| {
+                if let Ok((_, assigned)) = item {
+                    !assigned
+                } else {
+                    false
+                }
+            })
+            .map_or_else(
+                || Err(ContractError::NoAvailableId {}),
+                |f| {
+                    // if result is found, parse the key to Uint128
+                    let key = f.unwrap().0;
+                    Ok(Uint128::from_str(&key).unwrap())
+                },
+            )
+            .unwrap();
     }
 
     let owner_of = OWNER_OF
         .may_load(storage, next_id.to_string())?
         .unwrap_or("".to_string());
 
-    if owner_of != "" {
+    if !owner_of.is_empty() {
         return Err(ContractError::AlreadyExists {});
     }
 
@@ -678,24 +660,19 @@ fn _mint(
 }
 
 fn _burn(storage: &mut dyn Storage, env: Env, from: String) -> Result<WasmMsg, ContractError> {
-    if from == "" {
+    if from.is_empty() {
         return Err(ContractError::InvalidSender {});
     }
 
     let mut owned = OWNED.may_load(storage, from.clone())?.unwrap_or(vec![]);
     let id = owned[owned.len() - 1];
 
-    // Return token_id to pool
+    // set token_id as unassigned
     let is_assigned = ID_ASSIGNED.load(storage, id.to_string())?;
 
     if !is_assigned {
         return Err(ContractError::IdNotAssigned {});
     }
-
-    TOKEN_POOL.update(storage, |mut pool| -> StdResult<_> {
-        pool.push(id);
-        Ok(pool)
-    })?;
 
     ID_ASSIGNED.save(storage, id.to_string(), &false)?;
 
@@ -733,7 +710,7 @@ pub fn generate_nft_event(
     recipient: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -753,7 +730,7 @@ pub fn generate_nft_mint_event(
     recipient: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -772,7 +749,7 @@ pub fn generate_nft_burn_event(
     sender: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 

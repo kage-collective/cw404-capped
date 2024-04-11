@@ -1,6 +1,6 @@
 use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
 
-use cosmwasm_std::{to_json_binary, Binary, Deps, Env, StdResult, Uint128};
+use cosmwasm_std::{to_json_binary, Binary, Deps, Env, Order, StdResult, Uint128};
 
 use cw721::{
     AllNftInfoResponse, Approval, ContractInfoResponse, NftInfoResponse, NumTokensResponse,
@@ -13,8 +13,8 @@ use crate::msg::{
     ExtendedInfoResponse, MinterResponse, QueryMsg, TokenPoolResponse, UserInfoResponse,
 };
 use crate::state::{
-    ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, LOCKED, MINTED, NAME, OWNED,
-    OWNED_INDEX, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOKEN_POOL, TOTAL_SUPPLY,
+    ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, ID_ASSIGNED, LOCKED, MINTED, NAME,
+    OWNED, OWNED_INDEX, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOTAL_SUPPLY,
 };
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -184,13 +184,13 @@ fn all_nft_info(
         .may_load(deps.storage, token_id.clone())?
         .unwrap_or("".to_string());
     let info = nft_info(deps, token_id)?;
-    let approvals = if spender.len() == 0 {
+    let approvals = if spender.is_empty() {
         vec![]
     } else {
         vec![Approval {
-            /// Account that can transfer/send the token
+            // Account that can transfer/send the token
             spender: spender.to_string(),
-            /// When the Approval expires (maybe Expiration::never)
+            // When the Approval expires (maybe Expiration::never)
             expires: Expiration::Never {},
         }]
     };
@@ -279,8 +279,21 @@ pub fn minter(deps: Deps) -> StdResult<MinterResponse> {
 }
 
 pub fn token_pool(deps: Deps) -> StdResult<TokenPoolResponse> {
-    let pool = TOKEN_POOL.load(deps.storage)?;
+    let pool_count = ID_ASSIGNED
+        .range(deps.storage, None, None, Order::Ascending)
+        .filter(|item| {
+            if let Ok((_, assigned)) = item {
+                !assigned
+            } else {
+                false
+            }
+        })
+        .count();
+
     let token_id_cap = TOKEN_ID_CAP.load(deps.storage)?;
 
-    Ok(TokenPoolResponse { pool, token_id_cap })
+    Ok(TokenPoolResponse {
+        pool_count: pool_count as u64,
+        token_id_cap,
+    })
 }
