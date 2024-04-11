@@ -184,7 +184,7 @@ fn all_nft_info(
         .may_load(deps.storage, token_id.clone())?
         .unwrap_or("".to_string());
     let info = nft_info(deps, token_id)?;
-    let approvals = if spender.len() == 0 {
+    let approvals = if spender.is_empty() {
         vec![]
     } else {
         vec![Approval {

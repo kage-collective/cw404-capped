@@ -25,7 +25,7 @@ pub fn instantiate(
 
     let token_cap = msg.token_id_cap.unwrap_or(msg.total_native_supply);
 
-    if token_cap < Uint128::from(msg.total_native_supply) {
+    if token_cap < msg.total_native_supply {
         return Err(ContractError::InvalidCap {});
     }
 
@@ -149,7 +149,7 @@ fn set_token_id_cap(
     cap: Uint128,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -172,7 +172,7 @@ pub fn set_whitelist(
     state: bool,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -206,7 +206,7 @@ pub fn set_lock(
     let owner_of = OWNER_OF
         .may_load(deps.storage, target.to_string())?
         .unwrap_or("".to_string());
-    if info.sender.to_string() != owner_of {
+    if info.sender != owner_of {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -224,7 +224,7 @@ pub fn set_base_token_uri(
     uri: String,
 ) -> Result<Response, ContractError> {
     let owner = OWNER.load(deps.storage)?;
-    if info.sender.to_string() != owner {
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -262,14 +262,11 @@ fn transfer_from(
             return Err(ContractError::InvalidSender {});
         }
 
-        if to == "" {
+        if to.is_empty() {
             return Err(ContractError::InvalidRecipient {});
         }
 
-        if info.sender.to_string() != from
-            && !is_approved_for_all
-            && info.sender.to_string() != get_approved
-        {
+        if info.sender != from && !is_approved_for_all && info.sender != get_approved {
             return Err(ContractError::Unauthorized {});
         }
 
@@ -302,14 +299,14 @@ fn transfer_from(
             .may_load(deps.storage, from.clone())?
             .unwrap_or(vec![]);
 
-        let updated_id = vec_updated_id.get(vec_updated_id.len() - 1).unwrap();
+        let updated_id = vec_updated_id.last().unwrap();
         let owned_index = OWNED_INDEX
             .may_load(deps.storage, amount_or_id.to_string())?
             .unwrap_or(Uint128::zero());
 
         OWNED_INDEX.save(deps.storage, updated_id.to_string(), &owned_index)?;
 
-        vec_updated_id[owned_index.u128() as usize] = updated_id.clone();
+        vec_updated_id[owned_index.u128() as usize] = *updated_id;
         vec_updated_id.pop();
 
         OWNED.save(deps.storage, from.clone(), &vec_updated_id)?;
@@ -381,7 +378,7 @@ fn approve(
         let is_approved_for_all = APPROVED_FOR_ALL
             .may_load(deps.storage, (owner.to_string(), info.sender.to_string()))?
             .unwrap_or(false);
-        if info.sender.to_string() != owner.to_string() && !is_approved_for_all {
+        if info.sender != owner && !is_approved_for_all {
             return Err(ContractError::Unauthorized {});
         }
 
@@ -595,7 +592,7 @@ fn _transfer(
 }
 
 fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, ContractError> {
-    if to == "" {
+    if to.is_empty() {
         return Err(ContractError::InvalidRecipient {});
     }
 
@@ -634,7 +631,7 @@ fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, Con
         .may_load(storage, next_id.to_string())?
         .unwrap_or("".to_string());
 
-    if owner_of != "" {
+    if !owner_of.is_empty() {
         return Err(ContractError::AlreadyExists {});
     }
 
@@ -663,7 +660,7 @@ fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, Con
 }
 
 fn _burn(storage: &mut dyn Storage, env: Env, from: String) -> Result<WasmMsg, ContractError> {
-    if from == "" {
+    if from.is_empty() {
         return Err(ContractError::InvalidSender {});
     }
 
@@ -713,7 +710,7 @@ pub fn generate_nft_event(
     recipient: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -733,7 +730,7 @@ pub fn generate_nft_mint_event(
     recipient: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -752,7 +749,7 @@ pub fn generate_nft_burn_event(
     sender: String,
     token_id: Uint128,
 ) -> Result<Response, ContractError> {
-    if info.sender.to_string() != env.contract.address.to_string() {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 

@@ -8,7 +8,7 @@ mod tests {
         contract::{execute, instantiate},
         msg::{TokenPoolResponse, UserInfoResponse},
         query::query,
-        ContractError, ExecuteMsg, InstantiateMsg, QueryMsg,
+        ExecuteMsg, InstantiateMsg, QueryMsg,
     };
 
     #[test]
