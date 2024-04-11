@@ -108,13 +108,10 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         assert_eq!(
             wasms
@@ -165,13 +162,10 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         // assert max token_id is 5
         assert_eq!(
@@ -244,13 +238,10 @@ mod tests {
 
         // wasms.clone().for_each(|w| println!("{:?}", w.attributes));
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         assert_eq!(
             wasms
@@ -302,13 +293,10 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         assert_eq!(
             wasms
@@ -335,13 +323,10 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         assert_eq!(
             wasms
@@ -416,13 +401,10 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        assert!(wasms
-            .clone()
-            .find(|w| w
-                .attributes
-                .iter()
-                .any(|a| a.key == "action" && a.value == "transfer"))
-            .is_some());
+        assert!(wasms.clone().any(|w| w
+            .attributes
+            .iter()
+            .any(|a| a.key == "action" && a.value == "transfer")));
 
         assert_eq!(
             wasms
@@ -533,7 +515,7 @@ mod tests {
         assert_eq!(
             resp,
             UserInfoResponse {
-                owned: (1..=50).map(|i| Uint128::new(i)).collect(),
+                owned: (1..=50).map(Uint128::new).collect(),
                 balances: Uint128::new(50) * Uint128::new(10).pow(18)
             }
         );
