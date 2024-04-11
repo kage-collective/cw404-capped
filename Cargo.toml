@@ -2,10 +2,10 @@
 members = ["packages/*", "contracts/*"]
 
 [workspace.package]
-version = "0.20.2"
+version = "0.21.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/kage-collective/cw404-fixed"
+repository = "https://github.com/kage-collective/cw404-capped"
 homepage = "https://kage.finance"
 documentation = "https://docs.kage.finance"
 rust-version = "1.65"
@@ -25,7 +25,6 @@ cw-utils = "^1.0"
 schemars = "^0.8"
 serde = { version = "1.0.152", default-features = false, features = ["derive"] }
 thiserror = "^1.0"
-sha3 = "0.9.1"
 
 [profile.release.package.cw721-base]
 codegen-units = 1

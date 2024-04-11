@@ -31,6 +31,9 @@ pub enum ContractError {
     #[error("IdNotAssigned")]
     IdNotAssigned {},
 
+    #[error("NoAvailableId")]
+    NoAvailableId {}, // fatal, not supposed to happen
+
     #[error("InvalidCap")]
     InvalidCap {},
 

@@ -8,7 +8,7 @@ mod tests {
         contract::{execute, instantiate},
         msg::{TokenPoolResponse, UserInfoResponse},
         query::query,
-        ExecuteMsg, InstantiateMsg, QueryMsg,
+        ContractError, ExecuteMsg, InstantiateMsg, QueryMsg,
     };
 
     #[test]
@@ -302,8 +302,6 @@ mod tests {
 
         let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
 
-        // wasms.clone().for_each(|w| println!("{:?}", w.attributes));
-
         assert!(wasms
             .clone()
             .find(|w| w
@@ -442,7 +440,230 @@ mod tests {
             .query_wasm_smart(cw404_contract, &QueryMsg::TokenPool {})
             .unwrap();
 
-        assert_eq!(resp.pool.len(), 9);
+        assert_eq!(resp.pool_count, 9);
         assert_eq!(resp.token_id_cap, Uint128::new(9));
+    }
+
+    #[test]
+    fn test_sequential_mints() {
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &Addr::unchecked("user"), coins(101, "inj"))
+                .unwrap()
+        });
+
+        let code = ContractWrapper::new(execute, instantiate, query);
+        let code_id = app.store_code(Box::new(code));
+
+        let cw404_contract = app
+            .instantiate_contract(
+                code_id,
+                Addr::unchecked("owner"),
+                &InstantiateMsg {
+                    name: "test".to_string(),
+                    symbol: "test".to_string(),
+                    decimals: 18,
+                    total_native_supply: Uint128::new(100),
+                    token_id_cap: Some(Uint128::new(100)),
+                    minter: None,
+                },
+                &[],
+                "Contract",
+                None,
+            )
+            .unwrap();
+
+        // whitelist self to prevent burning
+        app.execute_contract(
+            Addr::unchecked("owner"),
+            cw404_contract.clone(),
+            &ExecuteMsg::SetWhitelist {
+                target: Addr::unchecked("owner").to_string(),
+                state: true,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // owner -> user transfer 50 tokens
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("owner"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user").to_string(),
+                    amount: Uint128::new(50) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter(|w| w
+                    .attributes
+                    .iter()
+                    .any(|a| a.key == "action" && a.value == "mint"))
+                .count(),
+            50
+        );
+
+        let resp: TokenPoolResponse = app
+            .wrap()
+            .query_wasm_smart(cw404_contract.clone(), &QueryMsg::TokenPool {})
+            .unwrap();
+
+        assert_eq!(resp.pool_count, 0);
+        assert_eq!(resp.token_id_cap, Uint128::new(100));
+
+        let resp: UserInfoResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw404_contract.clone(),
+                &QueryMsg::UserInfo {
+                    address: Addr::unchecked("user").to_string(),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            resp,
+            UserInfoResponse {
+                owned: (1..=50).map(|i| Uint128::new(i)).collect(),
+                balances: Uint128::new(50) * Uint128::new(10).pow(18)
+            }
+        );
+
+        // User -> User3 transfer 25 tokens (burns 25 tokens, mint 25 tokens)
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user3").to_string(),
+                    amount: Uint128::new(25) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            75
+        );
+
+        // User3 -> User2 transfer 25 tokens (burns 25 tokens, mint 25 tokens)
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user3"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user2").to_string(),
+                    amount: Uint128::new(25) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            100
+        );
+        // cap reached, next mints will reuse token_id lexically
+        let resp: TokenPoolResponse = app
+            .wrap()
+            .query_wasm_smart(cw404_contract.clone(), &QueryMsg::TokenPool {})
+            .unwrap();
+
+        assert_eq!(resp.pool_count, 50);
+        assert_eq!(resp.token_id_cap, Uint128::new(100));
+
+        //  User2 -> user transfer 25 tokens (burns 25 tokens, remint 25 tokens)
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("user2"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user").to_string(),
+                    amount: Uint128::new(25) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter_map(|w| w.attributes.iter().find(|a| a.key == "token_id"))
+                .map(|a| a.value.parse::<u64>().unwrap())
+                .reduce(|a, b| a.max(b))
+                .unwrap(),
+            100
+        );
+
+        let resp: TokenPoolResponse = app
+            .wrap()
+            .query_wasm_smart(cw404_contract.clone(), &QueryMsg::TokenPool {})
+            .unwrap();
+
+        assert_eq!(resp.pool_count, 50);
+        assert_eq!(resp.token_id_cap, Uint128::new(100));
+
+        // Mint out all supply
+        // owner -> user transfer 50 tokens
+        let resp = app
+            .execute_contract(
+                Addr::unchecked("owner"),
+                cw404_contract.clone(),
+                &ExecuteMsg::Transfer {
+                    recipient: Addr::unchecked("user").to_string(),
+                    amount: Uint128::new(50) * Uint128::new(10).pow(18),
+                },
+                &[],
+            )
+            .unwrap();
+
+        let wasms = resp.events.iter().filter(|ev| ev.ty == "wasm");
+
+        // wasms.clone().for_each(|w| println!("{:?}", w.attributes));
+
+        assert_eq!(
+            wasms
+                .clone()
+                .filter(|w| w
+                    .attributes
+                    .iter()
+                    .any(|a| a.key == "action" && a.value == "mint"))
+                .count(),
+            50
+        );
+
+        let resp: TokenPoolResponse = app
+            .wrap()
+            .query_wasm_smart(cw404_contract.clone(), &QueryMsg::TokenPool {})
+            .unwrap();
+
+        assert_eq!(resp.pool_count, 0);
+        assert_eq!(resp.token_id_cap, Uint128::new(100));
     }
 }

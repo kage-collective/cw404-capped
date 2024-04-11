@@ -26,9 +26,6 @@ pub const OWNED: Map<String, Vec<Uint128>> = Map::new("owned");
 pub const OWNED_INDEX: Map<String, Uint128> = Map::new("owned_index");
 pub const APPROVED_FOR_ALL: Map<(String, String), bool> = Map::new("approved_for_all");
 
-/// @dev Tracks the available token_ids for minting
-pub const TOKEN_POOL: Item<Vec<Uint128>> = Item::new("token_pool");
-
 /// @dev Tracks assignment flag, tokenId -> isAssigned
 pub const ID_ASSIGNED: Map<String, bool> = Map::new("id_assigned");
 

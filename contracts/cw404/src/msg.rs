@@ -197,6 +197,6 @@ pub struct ExtendedInfoResponse {
 
 #[cw_serde]
 pub struct TokenPoolResponse {
-    pub pool: Vec<Uint128>,
+    pub pool_count: u64,
     pub token_id_cap: Uint128,
 }
