@@ -13,8 +13,8 @@ use crate::msg::{
     ExtendedInfoResponse, MinterResponse, QueryMsg, TokenPoolResponse, UserInfoResponse,
 };
 use crate::state::{
-    ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, ID_ASSIGNED, LOCKED, MINTED, NAME,
-    OWNED, OWNED_INDEX, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOTAL_SUPPLY,
+    ALLOWANCE, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED, LOCKED, MINTED, NAME, OWNED,
+    OWNED_INDEX, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOTAL_SUPPLY, UNASSIGNED_IDS,
 };
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -279,15 +279,8 @@ pub fn minter(deps: Deps) -> StdResult<MinterResponse> {
 }
 
 pub fn token_pool(deps: Deps) -> StdResult<TokenPoolResponse> {
-    let pool_count = ID_ASSIGNED
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter(|item| {
-            if let Ok((_, assigned)) = item {
-                !assigned
-            } else {
-                false
-            }
-        })
+    let pool_count = UNASSIGNED_IDS
+        .keys(deps.storage, None, None, Order::Ascending)
         .count();
 
     let token_id_cap = TOKEN_ID_CAP.load(deps.storage)?;

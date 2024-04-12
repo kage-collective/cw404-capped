@@ -28,3 +28,5 @@ tarpaulin-report.*
 
 # raw json schema files
 **/raw/*.json
+
+**/node_modules/

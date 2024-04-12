@@ -26,8 +26,8 @@ pub const OWNED: Map<String, Vec<Uint128>> = Map::new("owned");
 pub const OWNED_INDEX: Map<String, Uint128> = Map::new("owned_index");
 pub const APPROVED_FOR_ALL: Map<(String, String), bool> = Map::new("approved_for_all");
 
-/// @dev Tracks assignment flag, tokenId -> isAssigned
-pub const ID_ASSIGNED: Map<String, bool> = Map::new("id_assigned");
+/// @dev Tracks assignment flag, tokenId -> isUnassigned
+pub const UNASSIGNED_IDS: Map<String, bool> = Map::new("unassigned_ids");
 
 /// Additional features
 /// @dev prevents being burnt due to transfers made in mistake
