@@ -1,16 +1,16 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    to_json_binary, Binary, DepsMut, Env, MessageInfo, Order, Response, StdResult, Storage,
-    Uint128, WasmMsg,
+    to_json_binary, Binary, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint128,
+    WasmMsg,
 };
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Cw20ReceiveMsg, ALLOWANCE, APPROVED_FOR_ALL, BALANCES, BASE_TOKEN_URI, DECIMALS, GET_APPROVED,
-    ID_ASSIGNED, LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_ID_CAP,
-    TOTAL_SUPPLY, WHITELIST,
+    LOCKED, MINTED, NAME, OWNED, OWNED_INDEX, OWNER, OWNER_OF, SYMBOL, TOKEN_ID_CAP, TOTAL_SUPPLY,
+    UNASSIGNED_IDS, WHITELIST,
 };
 
 pub fn instantiate(
@@ -607,22 +607,11 @@ fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, Con
     } else {
         // all tokens minted
         // find first unassigned token in map (lexical order as key is in string)
-        next_id = ID_ASSIGNED
-            .range(storage, None, None, Order::Ascending)
-            .find(|item| {
-                if let Ok((_, assigned)) = item {
-                    !assigned
-                } else {
-                    false
-                }
-            })
+        next_id = UNASSIGNED_IDS
+            .first(storage)?
             .map_or_else(
                 || Err(ContractError::NoAvailableId {}),
-                |f| {
-                    // if result is found, parse the key to Uint128
-                    let key = f.unwrap().0;
-                    Ok(Uint128::from_str(&key).unwrap())
-                },
+                |(key, _)| Ok(Uint128::from_str(&key).unwrap()),
             )
             .unwrap();
     }
@@ -635,7 +624,7 @@ fn _mint(storage: &mut dyn Storage, env: Env, to: String) -> Result<WasmMsg, Con
         return Err(ContractError::AlreadyExists {});
     }
 
-    ID_ASSIGNED.save(storage, next_id.to_string(), &true)?;
+    UNASSIGNED_IDS.remove(storage, next_id.to_string());
 
     OWNER_OF.save(storage, next_id.to_string(), &to)?;
 
@@ -667,14 +656,7 @@ fn _burn(storage: &mut dyn Storage, env: Env, from: String) -> Result<WasmMsg, C
     let mut owned = OWNED.may_load(storage, from.clone())?.unwrap_or(vec![]);
     let id = owned[owned.len() - 1];
 
-    // set token_id as unassigned
-    let is_assigned = ID_ASSIGNED.load(storage, id.to_string())?;
-
-    if !is_assigned {
-        return Err(ContractError::IdNotAssigned {});
-    }
-
-    ID_ASSIGNED.save(storage, id.to_string(), &false)?;
+    UNASSIGNED_IDS.save(storage, id.to_string(), &true)?;
 
     owned.pop();
     OWNED.save(storage, from.clone(), &owned)?;
