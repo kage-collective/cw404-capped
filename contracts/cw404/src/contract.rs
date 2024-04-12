@@ -4,7 +4,7 @@ pub use crate::msg::{ExecuteMsg, InstantiateMsg, MinterResponse, QueryMsg};
 use cosmwasm_std::Empty;
 
 // Version info for migration
-pub const CONTRACT_NAME: &str = "dojoswap:cw404";
+pub const CONTRACT_NAME: &str = "kagefinance:cw404-capped";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(not(feature = "library"))]
